@@ -30,58 +30,115 @@ export const ChatProvider = ({ children }) => {
     setMessages((messages) => messages.slice(1));
   };
 
+  // const startRecording = async () => {
+  //   try {
+  //     const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  //     const recorder = new MediaRecorder(mediaStream);
+
+  //     recorder.ondataavailable = (event) => {
+  //       if (event.data.size > 0) {
+  //         setAudioChunks((prevChunks) => [...prevChunks, event.data]);
+  //       }
+  //     };
+
+  //     recorder.start();
+  //     setMediaRecorder(recorder);
+  //     setIsRecording(true);
+  //   } catch (error) {
+  //     console.error("Error accessing microphone:", error);
+  //   }
+  // };
+
+  // const stopRecording = async () => {
+  //   if (mediaRecorder) {
+  //     mediaRecorder.stop();
+  //     mediaRecorder.stream.getTracks().forEach((track) => track.stop());
+  //     setMediaRecorder(null);
+  //     setIsRecording(false);
+
+  //     if (audioChunks.length === 0) {
+  //       console.error("No audio chunks available!");
+  //       return;
+  //     }
+
+  //     const audioBlob = new Blob(audioChunks, { type: "audio/mp3" });
+  //     const audioFile = new File([audioBlob], "recording.mp3", { type: "audio/mp3" });
+
+  //     const formData = new FormData();
+  //     formData.append("audio", audioFile);
+
+  //     try {
+  //       const response = await fetch(`${backendUrl}/transcribe`, {
+  //         method: "POST",
+  //         body: formData,
+  //       });
+  //       const resp = (await response.json()).messages;
+  //       setMessages((messages) => [...messages, ...resp]);
+  //       setLoading(false);
+  //     } catch (error) {
+  //       console.error("Error sending audio to backend:", error);
+  //     }
+
+  //     setAudioChunks([]);
+  //   }
+  // };
   const startRecording = async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(mediaStream);
-
+  
+      let localAudioChunks = []; 
+  
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          setAudioChunks((prevChunks) => [...prevChunks, event.data]);
+          localAudioChunks.push(event.data); 
         }
       };
-
+  
+      recorder.onstop = async () => {
+        if (localAudioChunks.length === 0) {
+          console.error("No audio chunks available!");
+          return;
+        }
+  
+        const audioBlob = new Blob(localAudioChunks, { type: "audio/mp3" });
+        const audioFile = new File([audioBlob], "recording.mp3", { type: "audio/mp3" });
+  
+        const formData = new FormData();
+        formData.append("audio", audioFile);
+  
+        try {
+          const response = await fetch(`${backendUrl}/transcribe`, {
+            method: "POST",
+            body: formData,
+          });
+          const resp = (await response.json()).messages;
+          setMessages((messages) => [...messages, ...resp]);
+        } catch (error) {
+          console.error("Error sending audio to backend:", error);
+        }
+  
+        setLoading(false);
+      };
+  
       recorder.start();
       setMediaRecorder(recorder);
+      setAudioChunks([]); // Clear state audioChunks
       setIsRecording(true);
     } catch (error) {
       console.error("Error accessing microphone:", error);
     }
   };
-
-  const stopRecording = async () => {
+  
+  const stopRecording = () => {
     if (mediaRecorder) {
       mediaRecorder.stop();
       mediaRecorder.stream.getTracks().forEach((track) => track.stop());
       setMediaRecorder(null);
       setIsRecording(false);
-
-      if (audioChunks.length === 0) {
-        console.error("No audio chunks available!");
-        return;
-      }
-
-      const audioBlob = new Blob(audioChunks, { type: "audio/mp3" });
-      const audioFile = new File([audioBlob], "recording.mp3", { type: "audio/mp3" });
-
-      const formData = new FormData();
-      formData.append("audio", audioFile);
-
-      try {
-        const response = await fetch(`${backendUrl}/transcribe`, {
-          method: "POST",
-          body: formData,
-        });
-        const resp = (await response.json()).messages;
-        setMessages((messages) => [...messages, ...resp]);
-        setLoading(false);
-      } catch (error) {
-        console.error("Error sending audio to backend:", error);
-      }
-
-      setAudioChunks([]);
     }
   };
+
 
   useEffect(() => {
     if (messages.length > 0) {
